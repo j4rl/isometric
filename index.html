@@ -11,11 +11,25 @@
       <h1>Isometric Game</h1>
       <div class="help">
         <p>
-          Move: WASD or Left‑Click · Aim: Mouse · Melee: Space · Ranged: F · Debug: G
+          Move: WASD or Left‑Click · Aim: Mouse · Melee: Space · Ranged: F · Weapon: 1/2 or Q · Pan: Right/Middle Drag or Arrow Keys · Debug: G
         </p>
       </div>
     </div>
-    <canvas id="game" width="960" height="600"></canvas>
+    <canvas id="game"></canvas>
+    <div id="hud">
+      <div class="hud-left">
+        <div class="hp">
+          <div class="hp-bar"><div class="hp-fill" id="hp-fill"></div></div>
+          <div class="hp-text" id="hp-text">HP 0/0</div>
+        </div>
+        <div class="weapon" id="weapon-text">Weapon: Melee (1) · Toggle: Q</div>
+        <div class="stats" id="stats-text">STR 0 · AGI 0 · PER 0</div>
+      </div>
+      <div class="hud-right">
+        <canvas id="minimap" width="260" height="96"></canvas>
+        <div class="target" id="target-box"><span id="target-text"></span></div>
+      </div>
+    </div>
     <script type="module" src="src/main.js"></script>
   </body>
   </html>

@@ -1,22 +1,45 @@
 import { drawIsoImage, drawIsoTile, drawIsoSubImage } from './iso.js';
 
 export class Entity {
-  constructor({ x = 0, y = 0, z = 0, key = 'entities/player', radius = 0.4, speed = 3, hp = 100 } = {}) {
+  constructor({ x = 0, y = 0, z = 0, key = 'entities/player', radius = 0.4, speed = 3, hp = 100, stats } = {}) {
     this.x = x; this.y = y; this.z = z;
     this.key = key; // assets key
     this.radius = radius; // collision radius in tile units
-    this.speed = speed; // tiles per second
+    this.baseSpeed = speed; // tiles per second
     this.hp = hp;
     this.maxHp = hp;
     this.dead = false;
     this.facing = 0; // radians
     this.team = 'player';
+    // Stats: strength, agility, perception
+    const defaults = { str: 3, agi: 3, per: 3 };
+    this.stats = Object.assign(defaults, stats || {});
+    this._recalcDerived();
+  }
+
+  _recalcDerived() {
+    const { str, agi } = this.stats;
+    // Movement speed affected by agility
+    this.speed = this.baseSpeed * (1 + (agi - 3) * 0.08);
+    // Toughness reduces incoming damage
+    this.toughness = Math.max(0, Math.min(0.35, (str - 3) * 0.03));
+    // Dodge chance from agility
+    this.dodge = Math.max(0, Math.min(0.3, (agi - 3) * 0.03));
+    // Bonus HP from strength
+    const bonusHp = Math.max(0, (str - 3) * 10);
+    this.maxHp = Math.max(this.maxHp, this.hp) + bonusHp; // adjust cap
+    if (this.hp > this.maxHp) this.hp = this.maxHp;
   }
 
   get pos() { return { x: this.x, y: this.y, z: this.z }; }
 
-  takeDamage(dmg) {
-    this.hp -= dmg;
+  takeDamage(dmg, { kind = 'generic', attacker = null } = {}) {
+    // Dodge check (less effective vs melee)
+    const dodgeChance = kind === 'melee' ? this.dodge * 0.5 : this.dodge;
+    if (Math.random() < dodgeChance) return; // dodged
+    // Reduce by toughness
+    const reduced = dmg * (1 - (this.toughness || 0));
+    this.hp -= reduced;
     if (this.hp <= 0) {
       this.dead = true;
     }
@@ -48,7 +71,7 @@ export class Entity {
 
 export class Player extends Entity {
   constructor(opts = {}) {
-    super({ key: 'entities/player', speed: 4, radius: 0.35, hp: 120, ...opts });
+    super({ key: 'entities/player', speed: 4, radius: 0.35, hp: 120, stats: { str: 4, agi: 4, per: 4 }, ...opts });
     this.team = 'player';
     this.cooldowns = { melee: 0, ranged: 0 };
   }
@@ -110,7 +133,7 @@ export class Player extends Entity {
 
 export class Enemy extends Entity {
   constructor(opts = {}) {
-    super({ key: 'entities/enemy', speed: 2.2, radius: 0.35, hp: 60, ...opts });
+    super({ key: 'entities/enemy', speed: 2.2, radius: 0.35, hp: 60, stats: { str: 3, agi: 3, per: 2 }, ...opts });
     this.team = 'enemy';
   }
 
@@ -126,4 +149,23 @@ export class Enemy extends Entity {
     if (!game.isBlockedAt(nx, ny)) { this.x = nx; this.y = ny; }
     this.facing = Math.atan2(dy, dx);
   }
+}
+
+export function createEnemyByType(typeIndex = 0, pos = { x: 0, y: 0 }) {
+  // Define 10 enemy archetypes with distinct stats
+  const types = [
+    { name: 'Grunt', hp: 60, speed: 2.2, stats: { str: 3, agi: 3, per: 2 } },
+    { name: 'Runner', hp: 50, speed: 3.2, stats: { str: 2, agi: 5, per: 3 } },
+    { name: 'Brute', hp: 110, speed: 1.8, stats: { str: 6, agi: 2, per: 2 } },
+    { name: 'Scout', hp: 55, speed: 3.0, stats: { str: 2, agi: 5, per: 5 } },
+    { name: 'Shooter', hp: 65, speed: 2.4, stats: { str: 3, agi: 3, per: 6 } },
+    { name: 'Assassin', hp: 70, speed: 3.4, stats: { str: 4, agi: 6, per: 4 } },
+    { name: 'Tank', hp: 150, speed: 1.6, stats: { str: 7, agi: 1, per: 2 } },
+    { name: 'Skirmisher', hp: 80, speed: 2.8, stats: { str: 4, agi: 4, per: 4 } },
+    { name: 'Sniper', hp: 60, speed: 2.5, stats: { str: 3, agi: 3, per: 7 } },
+    { name: 'Elder', hp: 120, speed: 2.0, stats: { str: 5, agi: 2, per: 6 } },
+  ];
+  const idx = (typeIndex|0) % types.length;
+  const cfg = types[idx];
+  return new Enemy({ x: pos.x, y: pos.y, hp: cfg.hp, speed: cfg.speed, stats: cfg.stats, name: cfg.name, key: `entities/enemy${idx}`, typeIndex: idx });
 }

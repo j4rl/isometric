@@ -10,19 +10,30 @@ export class Pathfinder {
   }
 
   neighbors(x, y) {
-    // 4-directional to avoid corner clipping
-    const dirs = [ [1,0], [-1,0], [0,1], [0,-1] ];
+    // 8-directional with corner-cut prevention for diagonals
     const res = [];
-    for (const [dx, dy] of dirs) {
-      const nx = x + dx, ny = y + dy;
-      if (this.inBounds(nx, ny) && !this.isBlocked(nx, ny)) res.push({ x: nx, y: ny });
+    for (const dy of [-1, 0, 1]) {
+      for (const dx of [-1, 0, 1]) {
+        if (dx === 0 && dy === 0) continue;
+        const nx = x + dx, ny = y + dy;
+        if (!this.inBounds(nx, ny) || this.isBlocked(nx, ny)) continue;
+        if (dx !== 0 && dy !== 0) {
+          // diagonal: ensure we aren't cutting corners
+          if (this.isBlocked(x + dx, y) || this.isBlocked(x, y + dy)) continue;
+        }
+        const cost = (dx !== 0 && dy !== 0) ? Math.SQRT2 : 1;
+        res.push({ x: nx, y: ny, cost });
+      }
     }
     return res;
   }
 
   heuristic(a, b) {
-    // Manhattan distance for 4-neigh
-    return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+    // Octile distance suitable for 8-directional grids
+    const dx = Math.abs(a.x - b.x);
+    const dy = Math.abs(a.y - b.y);
+    const F = Math.SQRT2 - 1;
+    return (dx < dy) ? F * dx + dy : F * dy + dx;
   }
 
   findPath(start, goal, maxIterations = 800) {
@@ -61,7 +72,8 @@ export class Pathfinder {
       const curG = gScore.get(currentK) ?? Infinity;
       for (const n of this.neighbors(current.x, current.y)) {
         const nk = key(n);
-        const tentative = curG + 1;
+        const stepCost = n.cost || 1;
+        const tentative = curG + stepCost;
         if (tentative < (gScore.get(nk) ?? Infinity)) {
           came.set(nk, current);
           gScore.set(nk, tentative);
@@ -73,4 +85,3 @@ export class Pathfinder {
     return null;
   }
 }
-

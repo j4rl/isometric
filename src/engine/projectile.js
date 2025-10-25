@@ -17,8 +17,16 @@ export class Projectile {
   update(dt, game) {
     this.life -= dt;
     if (this.life <= 0) this.dead = true;
-    this.x += this.vx * dt;
-    this.y += this.vy * dt;
+
+    const nextX = this.x + this.vx * dt;
+    const nextY = this.y + this.vy * dt;
+    // Check projectile blocking tiles (height = 'high') at next position
+    if (game.blocksProjectileAt(nextX, nextY)) {
+      this.dead = true;
+      return;
+    }
+    this.x = nextX;
+    this.y = nextY;
     // collide against enemies if player fired; or player if enemy fired (not used yet)
     const targets = game.entities.filter(e => !e.dead && e.team !== this.team);
     for (const t of targets) {
@@ -26,7 +34,7 @@ export class Projectile {
       const dy = t.y - this.y;
       const d = Math.hypot(dx, dy);
       if (d < (t.radius + this.radius)) {
-        t.takeDamage(this.damage);
+        t.takeDamage(this.damage, { kind: 'ranged', attacker: this.owner });
         this.dead = true;
         break;
       }
@@ -71,7 +79,7 @@ export class Slash {
           const ang = Math.atan2(dy, dx);
           let da = Math.atan2(Math.sin(ang - this.angle), Math.cos(ang - this.angle));
           if (Math.abs(da) <= this.arc / 2) {
-            t.takeDamage(this.damage);
+            t.takeDamage(this.damage, { kind: 'melee', attacker: this.owner });
           }
         }
       }

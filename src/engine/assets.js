@@ -71,10 +71,25 @@ export class Assets {
     put('tiles/grass', this._makeTileDiamond('#2f7d32', '#1e5621'));
     put('tiles/stone', this._makeTileDiamond('#6b6f7a', '#4a4f57'));
     put('tiles/rock', this._makeTileDiamond('#8b5a2b', '#5c3b1c'));
+    put('tiles/water', this._makeTileDiamond('#1e76a8', '#174a6b'));
+    put('tiles/bridge', this._makeTileDiamond('#b88d4a', '#8b6a3b'));
+    put('tiles/bush', this._makeTileDiamond('#2f7d42', '#245a2f'));
+    put('tiles/tree', this._makeTileDiamond('#2f8f4e', '#1b4d2a'));
+    put('tiles/tallGrass', this._makeTileDiamond('#58c776', '#2faa45'));
+    put('tiles/house', this._makeTileDiamond('#8d939d', '#6b6f7a'));
+    put('tiles/hut', this._makeTileDiamond('#a36f4a', '#7d4f2f'));
+    put('tiles/dirt', this._makeTileDiamond('#6a4f2b', '#4a371f'));
+    put('tiles/portal', this._makeTileDiamond('#6a59c7', '#473e87'));
 
     // Entity placeholders: simple capsules and shapes
     put('entities/player', this._makeSheetCapsule('#2ea8ff', '#176d9b'));
     put('entities/enemy', this._makeSheetCapsule('#ff5252', '#a83232'));
+    // Enemy variants (0..9) tinted
+    const enemyColors = ['#ff5252', '#ffa726', '#ffd54a', '#66bb6a', '#26c6da', '#42a5f5', '#7e57c2', '#ec407a', '#8d6e63', '#bdbdbd'];
+    const enemyOutlines = ['#a83232', '#8b5a2b', '#8a7421', '#2f6a3a', '#176d9b', '#176bb5', '#4a3b8a', '#8a325d', '#5c3b2a', '#6b6f7a'];
+    for (let i = 0; i < 10; i++) {
+      put(`entities/enemy${i}`, this._makeSheetCapsule(enemyColors[i], enemyOutlines[i]));
+    }
     put('entities/bullet', this._makeCircle('#ffd54a'));
     put('entities/slash', this._makeSlashSheet('#6cf'));
   }

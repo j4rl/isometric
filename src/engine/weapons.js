@@ -29,15 +29,22 @@ export class Weapons {
     if (!this._canUse(kind, user)) return;
     if (kind === 'melee') {
       const { range, arc, damage } = this.config.melee;
-      const slash = new Slash({ x: user.x, y: user.y, angle: user.facing, range, arc, damage, owner: user });
+      const str = user?.stats?.str ?? 3;
+      const dmg = Math.round(damage * (1 + (str - 3) * 0.15));
+      const slash = new Slash({ x: user.x, y: user.y, angle: user.facing, range, arc, damage: dmg, owner: user });
       this.game.effects.push(slash);
       this._markUsed(kind, user);
     } else if (kind === 'ranged') {
       const { speed, damage, life } = this.config.ranged;
-      const p = new Projectile({ x: user.x, y: user.y, angle: user.facing, speed, damage, life, owner: user });
+      const per = user?.stats?.per ?? 3;
+      const dmg = Math.round(damage * (1 + (per - 3) * 0.05));
+      // Accuracy: add small spread inversely with perception
+      const baseSpread = 0.2; // radians
+      const spread = Math.max(0, baseSpread - (per - 3) * 0.04);
+      const angle = user.facing + (Math.random() * 2 - 1) * spread;
+      const p = new Projectile({ x: user.x, y: user.y, angle, speed, damage: dmg, life, owner: user });
       this.game.projectiles.push(p);
       this._markUsed(kind, user);
     }
   }
 }
-

@@ -2,6 +2,9 @@ import { isoToScreen, screenToIso, drawIsoImage, drawIsoTile } from './iso.js';
 import { Player, Enemy } from './entity.js';
 import { Weapons } from './weapons.js';
 import { Pathfinder } from './pathfinding.js';
+import { HUD } from '../ui/hud.js';
+import { PortalBurst } from './effects.js';
+import { playPortalSound } from './sfx.js';
 
 export class Game {
   constructor({ canvas, ctx, tileW, tileH, assets }) {
@@ -18,12 +21,20 @@ export class Game {
     this.weapons = new Weapons(this);
     this.originX = canvas.width / 2; // center map horizontally
     this.originY = 64; // vertical offset
+    this._bounds = null; // projected map bounds for camera clamping
+    this.zoom = 2; // camera zoom (applied via canvas scale)
+    this.fitMode = 'manual'; // 'manual' fixed zoom; 'cover'/'contain' auto-fit
+    this.cameraFollow = { enabled: true, lerp: 8 };
+    this.dpr = 1; // device pixel ratio
+    this.currentWeapon = 'melee';
     this.debug = false;
     this.time = 0;
     this.dt = 0;
     this.autopilot = null; // { path: [{x,y}, ...] }
+    this.drag = { active: false, lastX: 0, lastY: 0 };
     this._setupInput();
     this.last = performance.now();
+    this.hud = new HUD(this);
   }
 
   _setupInput() {
@@ -36,6 +47,9 @@ export class Game {
       this.input.keys[e.code] = true;
       if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
       if (e.code === 'KeyG') this.debug = !this.debug;
+      if (e.code === 'Digit1') this.currentWeapon = 'melee';
+      if (e.code === 'Digit2') this.currentWeapon = 'ranged';
+      if (e.code === 'KeyQ') this.currentWeapon = (this.currentWeapon === 'melee' ? 'ranged' : 'melee');
     });
     window.addEventListener('keyup', (e) => {
       this.input.keys[e.code] = false;
@@ -50,21 +64,44 @@ export class Game {
       const w = this.screenToWorld(x, y);
       this.input.mouseWorld = w;
     };
-    this.canvas.addEventListener('mousemove', updateMouse);
+    this.canvas.addEventListener('mousemove', (e) => {
+      updateMouse(e);
+      if (this.drag.active) {
+        const dx = e.movementX || (e.clientX - this.drag.lastX);
+        const dy = e.movementY || (e.clientY - this.drag.lastY);
+        this.originX += dx;
+        this.originY += dy;
+        this.drag.lastX = e.clientX;
+        this.drag.lastY = e.clientY;
+        e.preventDefault();
+        this._clampOrigin();
+      }
+    });
     this.canvas.addEventListener('mouseenter', updateMouse);
     this.canvas.addEventListener('mouseleave', updateMouse);
     this.canvas.addEventListener('mousedown', (e) => {
-      if (e.button !== 0 || !this.player) return;
-      const w = this.input.mouseWorld;
-      const tx = Math.round(w.x);
-      const ty = Math.round(w.y);
-      if (!this.pathfinder) return;
-      const path = this.pathfinder.findPath({ x: Math.round(this.player.x), y: Math.round(this.player.y) }, { x: tx, y: ty });
-      if (path && path.length) {
-        // Convert tile centers to fractional waypoints (tile center is integer)
-        this.autopilot = { path: path.map(p => ({ x: p.x, y: p.y })) };
+      // Left-click: pathfind move
+      if (e.button === 0 && this.player) {
+        const w = this.input.mouseWorld;
+        const tx = Math.round(w.x);
+        const ty = Math.round(w.y);
+        if (!this.pathfinder) return;
+        const path = this.pathfinder.findPath({ x: Math.round(this.player.x), y: Math.round(this.player.y) }, { x: tx, y: ty });
+        if (path && path.length) {
+          const smooth = this._smoothPath(path);
+          this.autopilot = { path: smooth.map(p => ({ x: p.x, y: p.y })) };
+        }
+      }
+      // Middle or right: drag-pan
+      if (e.button === 1 || e.button === 2) {
+        this.drag.active = true;
+        this.drag.lastX = e.clientX;
+        this.drag.lastY = e.clientY;
+        e.preventDefault();
       }
     });
+    window.addEventListener('mouseup', () => { this.drag.active = false; });
+    this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
   worldToScreen(wx, wy) {
@@ -75,15 +112,40 @@ export class Game {
 
   screenToWorld(sx, sy) {
     // Convert from screen pixel to isometric world tile coords (approximate)
-    const p = screenToIso(sx, sy - this.tileH, this.tileW, this.tileH, this.originX, this.originY);
+    const p = screenToIso(sx / this.zoom, sy / this.zoom - this.tileH, this.tileW, this.tileH, this.originX, this.originY);
     return p; // fractional tile coords
   }
 
   setMap(map) {
-    this.map = map;
+    // Accept either a grid of tile keys (strings) or a descriptor { grid: symbols, legend }
+    this.legend = null;
+    this.symbolGrid = null;
+    this.tileTextureGrid = null;
+    if (Array.isArray(map)) {
+      this.map = map; // tile key grid
+    } else if (map && Array.isArray(map.grid) && map.legend) {
+      this.legend = map.legend;
+      this.symbolGrid = map.grid;
+      // Convert symbols to tile keys for rendering
+      this.map = this.symbolGrid.map(row => row.map(sym => (this.legend[sym]?.key || 'grass')));
+      // Build a parallel texture grid if legend provides textureKey
+      this.tileTextureGrid = this.symbolGrid.map(row => row.map(sym => {
+        const L = this.legend[sym];
+        if (L && L.textureKey) return L.textureKey;
+        if (L && L.key) return `tiles/${L.key}`;
+        return 'tiles/grass';
+      }));
+      // Optional: height grid for projectile blocking ('high' blocks projectiles)
+      this.tileHeightGrid = this.symbolGrid.map(row => row.map(sym => (this.legend[sym]?.height || 'normal')));
+    } else {
+      this.map = [];
+    }
     const h = this.map.length;
     const w = h ? this.map[0].length : 0;
     this.pathfinder = new Pathfinder({ width: w, height: h, isBlocked: (x, y) => this.isBlocked(x, y) });
+    this._computeBounds();
+    this._applyFit();
+    this._clampOrigin(true);
   }
 
   spawnDemo() {
@@ -109,6 +171,14 @@ export class Game {
   }
 
   update(dt) {
+    // Camera pan with arrow keys
+    const panSpeed = 600; // pixels per second
+    if (this.input.keys['ArrowLeft']) this.originX += panSpeed * dt;
+    if (this.input.keys['ArrowRight']) this.originX -= panSpeed * dt;
+    if (this.input.keys['ArrowUp']) this.originY += panSpeed * dt;
+    if (this.input.keys['ArrowDown']) this.originY -= panSpeed * dt;
+    this._clampOrigin();
+
     for (const e of this.entities) e.update(dt, this);
     for (const p of this.projectiles) p.update(dt, this);
     for (const fx of this.effects) fx.update(dt, this);
@@ -116,21 +186,56 @@ export class Game {
     this.entities = this.entities.filter(e => !e.dead);
     this.projectiles = this.projectiles.filter(p => !p.dead);
     this.effects = this.effects.filter(fx => !fx.dead);
+    this._updateCamera(dt);
+
+    // Portal handling: if player stands on a portal tile, request next map
+    if (this.player && this.legend && this.symbolGrid) {
+      const x = Math.round(this.player.x);
+      const y = Math.round(this.player.y);
+      if (y >= 0 && x >= 0 && y < this.symbolGrid.length && x < this.symbolGrid[0].length) {
+        const sym = this.symbolGrid[y][x];
+        const L = this.legend[sym];
+        if (L && (L.portal || L.key === 'portal')) {
+          if (!this._portalCooldown || (this.time - this._portalCooldown) > 1.0) {
+            // visual + audio
+            this.effects.push(new PortalBurst(this.player.x, this.player.y));
+            try { playPortalSound(); } catch {}
+            window.dispatchEvent(new CustomEvent('game:portal', { detail: {} }));
+            this._portalCooldown = this.time;
+          }
+        }
+      }
+    }
+
+    // Hover target detection near mouse
+    this._updateHoverTarget();
   }
 
   draw() {
     const { ctx, canvas } = this;
+    // Reset transform and clear in device pixels
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#0e1013';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+    // Apply DPR scale, then zoom
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    ctx.save();
+    ctx.scale(this.zoom, this.zoom);
     // draw map tiles by y+x order to ensure correct stacking
     const h = this.map.length;
     const w = h ? this.map[0].length : 0;
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
-        const key = `tiles/${this.map[y][x]}`;
-        const img = this.assets.get(key);
+        let img = null;
+        if (this.legend && this.symbolGrid && this.tileTextureGrid) {
+          const texKey = this.tileTextureGrid[y][x];
+          img = this.assets.get(texKey);
+        } else {
+          const key = `tiles/${this.map[y][x]}`;
+          img = this.assets.get(key);
+        }
         if (img) {
           drawIsoImage(ctx, img, x, y, 0, this.tileW, this.tileH, this.originX, this.originY);
         } else {
@@ -155,13 +260,17 @@ export class Game {
     ];
     drawables.sort((a, b) => (a.y + a.x) - (b.y + b.x));
     for (const d of drawables) d.draw(ctx, this);
-
+    ctx.restore();
+    // HUD & overlays (DOM-based)
+    this.hud.update();
+    this.hud.renderMiniMap();
     if (this.debug) this._drawDebug();
   }
 
   _drawDebug() {
     const { ctx } = this;
     ctx.save();
+    ctx.setTransform(1,0,0,1,0,0);
     ctx.fillStyle = '#fff';
     ctx.font = '12px monospace';
     ctx.globalAlpha = 0.85;
@@ -183,9 +292,147 @@ export class Game {
     ctx.restore();
   }
 
+
+  _smoothPath(path) {
+    // String-pull smoothing: remove intermediate points if LOS is clear
+    if (!path || path.length <= 2) return path || [];
+    const result = [path[0]];
+    let i = 0;
+    while (i < path.length - 1) {
+      let j = path.length - 1;
+      // find farthest j such that i -> j has line-of-sight
+      for (; j > i + 1; j--) {
+        if (this._hasLineOfSight(path[i], path[j])) break;
+      }
+      result.push(path[j]);
+      i = j;
+    }
+    return result;
+  }
+
+  _hasLineOfSight(a, b) {
+    // Sample along the line at a few points to ensure no blocked tiles in between
+    const ax = a.x + 0.0001, ay = a.y + 0.0001;
+    const bx = b.x + 0.0001, by = b.y + 0.0001;
+    const dx = bx - ax, dy = by - ay;
+    const dist = Math.hypot(dx, dy);
+    const steps = Math.max(2, Math.ceil(dist * 6));
+    for (let s = 1; s <= steps; s++) {
+      const t = s / steps;
+      const x = ax + dx * t;
+      const y = ay + dy * t;
+      if (this.isBlockedAt(x, y)) return false;
+    }
+    return true;
+  }
+
+  _computeBounds() {
+    const h = this.map.length;
+    const w = h ? this.map[0].length : 0;
+    if (!w || !h) { this._bounds = null; return; }
+    const corners = [ {x:0,y:0}, {x:w-1,y:0}, {x:0,y:h-1}, {x:w-1,y:h-1} ];
+    let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity;
+    for (const c of corners) {
+      const p = isoToScreen(c.x, c.y, 0, this.tileW, this.tileH, 0, 0);
+      left = Math.min(left, p.x - this.tileW / 2);
+      right = Math.max(right, p.x + this.tileW / 2);
+      top = Math.min(top, p.y);
+      bottom = Math.max(bottom, p.y + this.tileH);
+    }
+    this._bounds = { left, right, top, bottom, width: right - left, height: bottom - top };
+  }
+
+  _clampOrigin(forceCenter = false) {
+    if (!this._bounds) return;
+    const B = this._bounds;
+    const cw = this.canvas.width / (this.dpr || 1), ch = this.canvas.height / (this.dpr || 1);
+    const z = this.zoom || 1;
+    let minOX = (cw / z) - B.right; // originX >= minOX
+    let maxOX = -B.left;            // originX <= maxOX
+    let minOY = (ch / z) - B.bottom;
+    let maxOY = -B.top;
+    if (minOX > maxOX || forceCenter) {
+      const centerOX = (cw / z - B.width) / 2 - B.left;
+      this.originX = centerOX;
+    } else {
+      this.originX = Math.max(minOX, Math.min(maxOX, this.originX));
+    }
+    if (minOY > maxOY || forceCenter) {
+      const centerOY = (ch / z - B.height) / 2 - B.top;
+      this.originY = centerOY;
+    } else {
+      this.originY = Math.max(minOY, Math.min(maxOY, this.originY));
+    }
+  }
+
+  _applyFit() {
+    if (this.fitMode === 'manual') return;
+    if (!this._bounds) return;
+    const B = this._bounds;
+    const cw = this.canvas.width / (this.dpr || 1), ch = this.canvas.height / (this.dpr || 1);
+    const zw = cw / B.width;
+    const zh = ch / B.height;
+    this.zoom = (this.fitMode === 'contain') ? Math.min(zw, zh) : Math.max(zw, zh);
+    // Center after setting zoom
+    const z = this.zoom || 1;
+    const centerX = (B.left + B.right) / 2;
+    const centerY = (B.top + B.bottom) / 2;
+    this.originX = cw / (2 * z) - centerX;
+    this.originY = ch / (2 * z) - centerY;
+  }
+
+  _updateCamera(dt) {
+    if (!this.player || !this.cameraFollow?.enabled) return;
+    const dpr = this.dpr || 1;
+    const cw = this.canvas.width / dpr;
+    const ch = this.canvas.height / dpr;
+    const z = this.zoom || 1;
+    const cx = (cw / z) * 0.5;
+    const cy = (ch / z) * 0.5;
+    const ws = this.worldToScreen(this.player.x, this.player.y);
+    const dx = cx - ws.x;
+    const dy = cy - ws.y;
+    const t = Math.min(1, (this.cameraFollow.lerp || 8) * dt);
+    this.originX += dx * t;
+    this.originY += dy * t;
+    this._clampOrigin();
+  }
+
+  _updateHoverTarget() {
+    const mw = this.input.mouseWorld;
+    if (!mw) { this.hoverTarget = null; return; }
+    // Limit by player's perception (view radius in tiles)
+    const per = this.player?.stats?.per ?? 3;
+    const view = 4 + (per - 3) * 1.2; // tiles
+    let best = null; let bestD = Infinity;
+    for (const e of this.entities) {
+      if (e.team !== 'enemy' || e.dead) continue;
+      const dx = e.x - mw.x;
+      const dy = e.y - mw.y;
+      const d = Math.hypot(dx, dy);
+      if (d < 0.7 && d < bestD) {
+        // Also require within player's view
+        const pdx = e.x - this.player.x; const pdy = e.y - this.player.y;
+        if (Math.hypot(pdx, pdy) <= view) { best = e; bestD = d; }
+      }
+    }
+    this.hoverTarget = best;
+  }
+
+  handleResize(dpr = 1) {
+    this.dpr = dpr;
+    this._applyFit();
+    this._clampOrigin(true);
+  }
+
   isBlocked(x, y) {
     // integer tile coords
     if (y < 0 || x < 0 || y >= this.map.length || x >= this.map[0].length) return true;
+    if (this.legend && this.symbolGrid) {
+      const sym = this.symbolGrid[y][x];
+      const L = this.legend[sym];
+      return !(L && L.passable);
+    }
     const t = this.map[y][x];
     return t === 'rock' || t === 'wall' || t === 'water';
   }
@@ -195,5 +442,18 @@ export class Game {
     const x = Math.round(wx);
     const y = Math.round(wy);
     return this.isBlocked(x, y);
+  }
+
+  tileHeight(x, y) {
+    if (!this.symbolGrid || !this.legend) return 'normal';
+    if (y < 0 || x < 0 || y >= this.symbolGrid.length || x >= this.symbolGrid[0].length) return 'normal';
+    const sym = this.symbolGrid[y][x];
+    return this.legend[sym]?.height || 'normal';
+  }
+
+  blocksProjectileAt(wx, wy) {
+    const x = Math.round(wx);
+    const y = Math.round(wy);
+    return this.tileHeight(x, y) === 'high';
   }
 }

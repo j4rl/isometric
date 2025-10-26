@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -10,9 +10,7 @@
     <div id="ui">
       <h1>Isometric Game</h1>
       <div class="help">
-        <p>
-          Move: WASD or Right‑Click · Aim/Attack: Left‑Click · Melee: Space · Ranged: F · Weapon Slot: 1/2 or Q · Cycle Melee: Z · Reload: R · Pan: Middle Drag or Arrow Keys · Debug: G
-        </p>
+        <p>Move: WASD or Right-Click · Aim/Attack: Left-Click · Slots: 1/2 or Q toggle · Cycle Weapon: Z · Toggle Type: X · Reload: R · Pan: Middle Drag or Arrow Keys · Debug: G</p>
       </div>
     </div>
     <canvas id="game"></canvas>
@@ -47,6 +45,8 @@
           </div>
         </div>
         <div class="points">Points left: <span id="points-left">10</span></div>
+        <h3 class="section">Choose Weapons (click two)</h3>
+        <div id="wep-list" class="wep-list"></div>
         <div class="actions">
           <button id="start-game" class="primary" disabled>Start</button>
         </div>
@@ -58,8 +58,12 @@
           <div class="hp-bar"><div class="hp-fill" id="hp-fill"></div></div>
           <div class="hp-text" id="hp-text">HP 0/0</div>
         </div>
-        <div class="weapon" id="weapon-text">Weapon: Melee (1) · Toggle: Q</div>
+        <div class="weapon" id="weapon-text">Weapon: —</div>
         <div class="stats" id="stats-text">STR 0 · AGI 0 · PER 0</div>
+        <div class="slots">
+          <span class="slot-ind" id="slot0-ind">1</span>
+          <span class="slot-ind" id="slot1-ind">2</span>
+        </div>
       </div>
       <div class="hud-right">
         <canvas id="minimap" width="260" height="96"></canvas>

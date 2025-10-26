@@ -2,7 +2,7 @@ import { Game } from './engine/game.js';
 import { Assets } from './engine/assets.js';
 import { Enemy, createEnemyByType } from './engine/entity.js';
 import { initCharacterCreate } from './ui/char_create.js';
-import { loadMapById } from './maps/loader.js';
+import { loadMapById, loadBitmapMap, defaultBitmapPalette } from './maps/loader.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d', { alpha: false });
@@ -59,8 +59,16 @@ window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
 // Load map from file `maps/map_X.txt` where X is a number; default to 1 and fallback to 1
-const mapId = parseInt(new URLSearchParams(location.search).get('map') || '1', 10) || 1;
-let mapDesc = await loadMapById(mapId);
+const params = new URLSearchParams(location.search);
+const bmp = params.get('bmp');
+const mapId = parseInt(params.get('map') || '1', 10) || 1;
+let mapDesc = null;
+if (bmp) {
+  // Load bitmap map
+  mapDesc = await loadBitmapMap(bmp, { palette: defaultBitmapPalette() });
+} else {
+  mapDesc = await loadMapById(mapId);
+}
 if (!mapDesc && mapId !== 1) {
   mapDesc = await loadMapById(1);
 }
@@ -126,13 +134,19 @@ window.addEventListener('game:portal', async () => {
 function spawnFromMap(desc) {
   if (!desc || !desc.grid || !desc.legend) return;
   const h = desc.grid.length; const w = h ? desc.grid[0].length : 0;
+  // Collect waypoints
+  const waypoints = [];
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const sym = desc.grid[y][x];
       const L = desc.legend[sym];
+      if (L && L.waypoint) waypoints.push({ x, y });
       if (L && L.spawnEnemy) {
         const type = typeof L.enemyType === 'number' ? L.enemyType : Math.floor(Math.random() * 10);
-        game.entities.push(createEnemyByType(type, { x, y }));
+        const e = createEnemyByType(type, { x, y });
+        if (typeof L.aiLevel === 'number') e.aiLevel = L.aiLevel;
+        if (e.aiLevel === 2 && waypoints.length) e.patrolPoints = waypoints.slice();
+        game.entities.push(e);
       }
     }
   }

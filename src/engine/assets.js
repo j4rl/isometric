@@ -80,6 +80,10 @@ export class Assets {
     put('tiles/hut', this._makeTileDiamond('#a36f4a', '#7d4f2f'));
     put('tiles/dirt', this._makeTileDiamond('#6a4f2b', '#4a371f'));
     put('tiles/portal', this._makeTileDiamond('#6a59c7', '#473e87'));
+    // Extra post-apoc placeholders
+    put('tiles/road', this._makeTileDiamond('#707070', '#4a4a4a'));
+    put('tiles/debris', this._makeTileDiamond('#5d4037', '#3e2723'));
+    put('tiles/car', this._makeTileDiamond('#9e9e9e', '#616161'));
 
     // Entity placeholders: simple capsules and shapes
     put('entities/player', this._makeSheetCapsule('#2ea8ff', '#176d9b'));

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Map Editor</title>
+    <link rel="stylesheet" href="src/styles.css" />
+    <style>
+      body { display: grid; grid-template-columns: 280px 1fr; height: 100vh; }
+      #sidebar { background: #1b1f23; padding: 12px; overflow: auto; border-right: 1px solid rgba(255,255,255,0.08); }
+      #editorCanvas { width: 100%; height: 100%; display: block; background: #0e1013; cursor: crosshair; }
+      .palette { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+      .color { height: 28px; border: 2px solid rgba(255,255,255,0.2); cursor: pointer; }
+      .color.active { border-color: #fff; }
+      .row { margin: 8px 0; }
+      .label { font-size: 12px; opacity: 0.9; margin-bottom: 4px; }
+      .btn { padding: 6px 10px; background: #4a90e2; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
+      input[type=number] { width: 80px; }
+    </style>
+  </head>
+  <body>
+    <div id="sidebar">
+      <h2>Map Editor</h2>
+      <div class="row">
+        <div class="label">Canvas Size</div>
+        <input type="number" id="w" value="80" min="8" step="1" /> ×
+        <input type="number" id="h" value="60" min="8" step="1" />
+        <button class="btn" id="resize">Resize</button>
+      </div>
+      <div class="row">
+        <div class="label">Palette (click to select)</div>
+        <div id="palette" class="palette"></div>
+      </div>
+      <div class="row">
+        <div class="label">Brush</div>
+        <input type="number" id="brush" value="1" min="1" max="10" step="1" />
+        <label><input type="checkbox" id="flood" /> Flood Fill</label>
+      </div>
+      <div class="row">
+        <div class="label">Import PNG</div>
+        <input type="file" id="importPng" accept="image/png,image/jpeg" />
+      </div>
+      <div class="row">
+        <button class="btn" id="exportPng">Export PNG</button>
+      </div>
+      <div class="row">
+        <div class="label">Legend (colors)</div>
+        <ul style="font-size:12px; line-height:1.6">
+          <li><span style="color:#4CAF50">■</span> Grass</li>
+          <li><span style="color:#8D6E63">■</span> Dirt</li>
+          <li><span style="color:#607D8B">■</span> Road</li>
+          <li><span style="color:#2196F3">■</span> Water</li>
+          <li><span style="color:#795548">■</span> Rock</li>
+          <li><span style="color:#2E7D32">■</span> Tall grass</li>
+          <li><span style="color:#1B5E20">■</span> Bush</li>
+          <li><span style="color:#33691E">■</span> Tree</li>
+          <li><span style="color:#9E9E9E">■</span> Ruin</li>
+          <li><span style="color:#5D4037">■</span> Debris</li>
+          <li><span style="color:#BDBDBD">■</span> Burned Car</li>
+          <li><span style="color:#FF5722">■</span> Portal</li>
+          <li><span style="color:#FFEB3B">■</span> Player Spawn</li>
+          <li><span style="color:#00E676">■</span> Waypoint</li>
+          <li><span style="color:#F44336">■</span> Enemy Spawn AI1</li>
+          <li><span style="color:#D32F2F">■</span> Enemy Spawn AI2</li>
+          <li><span style="color:#B71C1C">■</span> Enemy Spawn AI3</li>
+        </ul>
+      </div>
+    </div>
+    <canvas id="editorCanvas"></canvas>
+    <script type="module" src="src/editor.js"></script>
+  </body>
+  </html>

@@ -59,11 +59,35 @@ canvas#game {
 }
 .modal-card { width: 520px; background: rgba(20,22,26,0.95); border: 1px solid rgba(255,255,255,0.08); padding: 16px 18px; border-radius: 8px; color: #e8eaed; }
 .modal-card h2 { margin: 0 0 8px 0; font-size: 18px; }
+.modal-card .section { margin: 12px 0 6px 0; font-size: 14px; }
 .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 8px; }
 .stat .label { font-size: 13px; opacity: 0.9; margin-bottom: 6px; }
 .controls { display: flex; align-items: center; gap: 8px; }
 .controls .btn { width: 28px; height: 28px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.06); color: #e8eaed; border-radius: 4px; }
 .controls .val { width: 24px; text-align: center; font-weight: 600; }
+.wep-chooser { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 8px; }
+.slot .label { font-size: 13px; opacity: 0.9; margin-bottom: 6px; }
+.chooser-row { display: flex; align-items: center; gap: 8px; }
+.chooser-row .btn { width: 32px; height: 28px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.06); color: #e8eaed; border-radius: 4px; }
+.chooser-row .val { min-width: 120px; text-align: center; font-weight: 600; }
+
+.slots { margin-top: 8px; display: flex; gap: 6px; align-items: center; }
+.slot-ind { display: inline-flex; width: 20px; height: 20px; border-radius: 50%; align-items: center; justify-content: center; font-size: 12px; color: #0b0f14; background: #9aa0a6; border: 2px solid transparent; }
+.slot-ind.active { border-color: #ffffff; }
+.slot-ind.melee { background: #ffb74d; }
+.slot-ind.ranged { background: #64b5f6; }
+
+/* Character create: simple weapon list */
+.wep-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; max-height: 220px; overflow: auto; margin-top: 6px; }
+.wep-item { display: flex; align-items: center; gap: 8px; padding: 8px; border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; background: rgba(255,255,255,0.04); cursor: pointer; }
+.wep-item:hover { background: rgba(255,255,255,0.08); }
+.wep-item .badge { font-size: 11px; padding: 2px 6px; border-radius: 999px; color: #0b0f14; }
+.wep-item .badge.melee { background: #ffb74d; }
+.wep-item .badge.ranged { background: #64b5f6; }
+.wep-item .name { font-weight: 600; }
+.wep-item .req { font-size: 11px; opacity: 0.8; margin-left: auto; }
+.wep-item.locked { opacity: 0.5; cursor: not-allowed; }
+.wep-item.selected { outline: 2px solid #4a90e2; }
 .points { margin-top: 12px; font-size: 13px; }
 .actions { margin-top: 12px; display: flex; justify-content: flex-end; }
 .actions .primary { padding: 8px 14px; background: #4a90e2; color: #fff; border: none; border-radius: 6px; font-weight: 600; opacity: 0.9; }

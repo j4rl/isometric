@@ -53,14 +53,19 @@ export class Entity {
     const asset = game.assets.get(this.key);
     if (asset && asset.type === 'sheet') {
       const { img, fw, fh, cols, rows } = asset;
-      // Simple animation timer
       this.animTime = (this.animTime || 0) + game.dt;
       const fps = asset.fps || 8;
-      const totalFrames = cols * rows;
-      const frame = Math.floor(this.animTime * fps) % totalFrames;
-      const fx = frame % cols;
-      const fy = Math.floor(frame / cols);
-      drawIsoSubImage(ctx, img, fx * fw, fy * fh, fw, fh, this.x, this.y, this.z, game.tileW, game.tileH, game.originX, game.originY);
+      // Directional rows: if rows>=4, pick row by facing (N,E,S,W ordering as 0..3)
+      let rowIndex = 0;
+      if (rows >= 4) {
+        const ang = this.facing; // -pi..pi
+        const dir = Math.round((ang / (Math.PI/2))) & 3; // 0..3
+        // Map: 0≈right(E)->row1, 1≈down(S)->row2, 2≈left(W)->row3, 3≈up(N)->row0
+        const map = [1, 2, 3, 0];
+        rowIndex = map[dir] || 0;
+      }
+      const frame = Math.floor(this.animTime * fps) % cols;
+      drawIsoSubImage(ctx, img, frame * fw, rowIndex * fh, fw, fh, this.x, this.y, this.z, game.tileW, game.tileH, game.originX, game.originY);
     } else if (asset) {
       drawIsoImage(ctx, asset, this.x, this.y, this.z, game.tileW, game.tileH, game.originX, game.originY);
     } else {
@@ -125,9 +130,7 @@ export class Player extends Entity {
     this.cooldowns.melee = Math.max(0, this.cooldowns.melee - dt);
     this.cooldowns.ranged = Math.max(0, this.cooldowns.ranged - dt);
 
-    // attacks
-    if (game.input.keys['Space']) game.weapons.use('melee', this);
-    if (game.input.keys['KeyF']) game.weapons.use('ranged', this);
+    // attacks are handled via mouse in Game input; no key-based attacks
   }
 }
 
@@ -135,6 +138,8 @@ export class Enemy extends Entity {
   constructor(opts = {}) {
     super({ key: 'entities/enemy', speed: 2.2, radius: 0.35, hp: 60, stats: { str: 3, agi: 3, per: 2 }, ...opts });
     this.team = 'enemy';
+    this.aiLevel = opts.aiLevel || 1;
+    this._path = null; this._pathTimer = 0;
   }
 
   update(dt, game) {
@@ -143,11 +148,49 @@ export class Enemy extends Entity {
     const dx = player.x - this.x;
     const dy = player.y - this.y;
     const d = Math.hypot(dx, dy) || 1;
+    this.facing = Math.atan2(dy, dx);
+    // Patrol behavior (aiLevel 2): follow waypoints if provided
+    if (this.aiLevel === 2 && this.patrolPoints && this.patrolPoints.length) {
+      if (this._patrolIndex == null) this._patrolIndex = 0;
+      const tgt = this.patrolPoints[this._patrolIndex % this.patrolPoints.length];
+      const tx = tgt.x - this.x; const ty = tgt.y - this.y;
+      const td = Math.hypot(tx, ty) || 1;
+      if (td < 0.2) { this._patrolIndex = (this._patrolIndex + 1) % this.patrolPoints.length; }
+      else {
+        const step = this.speed * dt;
+        const nx = this.x + (tx/td) * step;
+        const ny = this.y + (ty/td) * step;
+        if (!game.isBlockedAt(nx, ny)) { this.x = nx; this.y = ny; }
+      }
+      return;
+    }
+    if (this.aiLevel >= 3 && game.pathfinder) {
+      // pathfind occasionally
+      this._pathTimer -= dt;
+      if (!this._path || this._pathTimer <= 0) {
+        const path = game.pathfinder.findPath({ x: Math.round(this.x), y: Math.round(this.y) }, { x: Math.round(player.x), y: Math.round(player.y) });
+        this._path = path && path.length ? path.slice(1) : null;
+        this._pathTimer = 0.5 + Math.random() * 0.5;
+      }
+      if (this._path && this._path.length) {
+        const tgt = this._path[0];
+        const tx = tgt.x - this.x; const ty = tgt.y - this.y;
+        const td = Math.hypot(tx, ty) || 1;
+        const step = this.speed * dt;
+        if (td < 0.1) { this._path.shift(); }
+        else {
+          const nx = this.x + (tx/td) * step;
+          const ny = this.y + (ty/td) * step;
+          if (!game.isBlockedAt(nx, ny)) { this.x = nx; this.y = ny; }
+        }
+        return;
+      }
+    }
+    // simple chase fallback
     const want = Math.min(this.speed * dt, d - 0.001);
     const nx = this.x + (dx / d) * want;
     const ny = this.y + (dy / d) * want;
     if (!game.isBlockedAt(nx, ny)) { this.x = nx; this.y = ny; }
-    this.facing = Math.atan2(dy, dx);
   }
 }
 

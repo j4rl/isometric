@@ -10,6 +10,8 @@ export class HUD {
     this.mmCtx = this.mm?.getContext('2d');
     this.targetBox = document.getElementById('target-box');
     this.targetText = document.getElementById('target-text');
+    this.slot0Ind = document.getElementById('slot0-ind');
+    this.slot1Ind = document.getElementById('slot1-ind');
   }
 
   update() {
@@ -22,9 +24,20 @@ export class HUD {
       this.hpText.textContent = `HP ${Math.ceil(p.hp)}/${p.maxHp}`;
     }
     if (this.weaponText) {
-      const info = g.weapons.getInfo(g.currentWeapon, p);
-      const ammo = info.ammo ? ` · Ammo ${info.ammo} (R reload)` : '';
-      this.weaponText.textContent = `Weapon: ${info.name} · Range ${info.range} · Dmg ~${info.damage} · DPS ~${info.dps}${ammo} (Toggle: Q, 1/2)`;
+      const info = g.weapons.getInfoActive(p);
+      const ammo = info.ammo ? ` · Ammo ${info.ammo}` : '';
+      const lock = info.locked && info.req ? ` · LOCKED (STR ${info.req.str||1} · AGI ${info.req.agi||1} · PER ${info.req.per||1})` : '';
+      this.weaponText.textContent = `Weapon: ${info.name} · DMG ~${info.damage} · DPS ~${info.dps}${ammo}${lock} (Q toggle, 1/2 slots, R reload)`;
+    }
+    // Slot indicators
+    const s0 = g.weapons.state.slots[0];
+    const s1 = g.weapons.state.slots[1];
+    const active = g.weapons.state.activeSlot;
+    if (this.slot0Ind) {
+      this.slot0Ind.className = `slot-ind ${active===0?'active':''} ${s0.type}`;
+    }
+    if (this.slot1Ind) {
+      this.slot1Ind.className = `slot-ind ${active===1?'active':''} ${s1.type}`;
     }
     if (this.statsText && p?.stats) {
       const { str, agi, per } = p.stats;

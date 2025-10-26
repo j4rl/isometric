@@ -42,17 +42,19 @@ export class Game {
     this.input = {
       keys: {},
       mouse: { x: 0, y: 0 },
-      mouseWorld: { x: 0, y: 0 }
+      mouseWorld: { x: 0, y: 0 },
+      mouseDownL: false
     };
     window.addEventListener('keydown', (e) => {
       this.input.keys[e.code] = true;
       if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
       if (e.code === 'KeyG') this.debug = !this.debug;
-      if (e.code === 'Digit1') this.currentWeapon = 'melee';
-      if (e.code === 'Digit2') this.currentWeapon = 'ranged';
-      if (e.code === 'KeyQ') this.currentWeapon = (this.currentWeapon === 'melee' ? 'ranged' : 'melee');
-      if (e.code === 'KeyR') this.weapons.reload(this.currentWeapon);
-      if (e.code === 'KeyZ') this.weapons.cycleMelee(+1);
+      if (e.code === 'Digit1') this.weapons.setActiveSlot(0);
+      if (e.code === 'Digit2') this.weapons.setActiveSlot(1);
+      if (e.code === 'KeyQ') this.weapons.toggleActiveSlot();
+      if (e.code === 'KeyR') this.weapons.reloadActive();
+      if (e.code === 'KeyZ') this.weapons.cycleActive(+1);
+      if (e.code === 'KeyX') this.weapons.toggleActiveType();
     });
     window.addEventListener('keyup', (e) => {
       this.input.keys[e.code] = false;
@@ -83,14 +85,18 @@ export class Game {
     this.canvas.addEventListener('mouseenter', updateMouse);
     this.canvas.addEventListener('mouseleave', updateMouse);
     this.canvas.addEventListener('mousedown', (e) => {
-      // Left-click: target/attack
+      // Left-click: attack in mouse direction (use target if present)
       if (e.button === 0 && this.player) {
-        // Select hover target and attempt one attack with selected weapon
-        const target = this.hoverTarget || null;
-        if (target) {
-          const kind = this.currentWeapon === 'ranged' ? 'ranged' : 'melee';
-          this.weapons.use(kind, this.player, target);
+        this.input.mouseDownL = true;
+        // use active slot
+        const w = this.input.mouseWorld;
+        if (w) {
+          const dx = w.x - this.player.x;
+          const dy = w.y - this.player.y;
+          this.player.facing = Math.atan2(dy, dx);
         }
+        const target = this.hoverTarget || null;
+        this.weapons.useActive(this.player, target);
       }
       // Middle: drag-pan
       if (e.button === 1) {
@@ -113,7 +119,10 @@ export class Game {
         }
       }
     });
-    window.addEventListener('mouseup', () => { this.drag.active = false; });
+    window.addEventListener('mouseup', (e) => {
+      this.drag.active = false;
+      if (e.button === 0) this.input.mouseDownL = false;
+    });
     this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
@@ -225,6 +234,18 @@ export class Game {
     // Hover target detection near mouse
     this._updateHoverTarget();
 
+    // Hold-to-fire when left mouse is held down
+    if (this.player && this.input.mouseDownL) {
+      const w = this.input.mouseWorld;
+      if (w) {
+        const dx = w.x - this.player.x;
+        const dy = w.y - this.player.y;
+        this.player.facing = Math.atan2(dy, dx);
+      }
+      const target = this.hoverTarget || null;
+      this.weapons.useActive(this.player, target);
+    }
+
     // Update explored mask around player
     this._updateExplored();
   }
@@ -246,6 +267,9 @@ export class Game {
     const w = h ? this.map[0].length : 0;
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
+        // Skip void (non-rectangular maps from bitmap: symbol may be space)
+        const sym = this.symbolGrid ? this.symbolGrid[y][x] : null;
+        if (sym === ' ' || sym === null) continue;
         let img = null;
         if (this.legend && this.symbolGrid && this.tileTextureGrid) {
           const texKey = this.tileTextureGrid[y][x];
@@ -278,27 +302,27 @@ export class Game {
     ];
     drawables.sort((a, b) => (a.y + a.x) - (b.y + b.x));
     for (const d of drawables) d.draw(ctx, this);
-    ctx.restore();
-    // Move marker overlay
+    // Move marker overlay (draw in world space so it aligns with tiles)
     if (this.moveMarker) {
       const p = this.worldToScreen(this.moveMarker.x, this.moveMarker.y);
+      const py = p.y - this.tileH / 2; // shift marker half a tile up
       ctx.save();
-      ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
       ctx.strokeStyle = '#6cf';
       ctx.globalAlpha = 0.9;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, 10, 0, Math.PI * 2);
+      ctx.arc(p.x, py, 10, 0, Math.PI * 2);
       ctx.stroke();
       ctx.beginPath();
-      ctx.moveTo(p.x - 8, p.y);
-      ctx.lineTo(p.x + 8, p.y);
-      ctx.moveTo(p.x, p.y - 8);
-      ctx.lineTo(p.x, p.y + 8);
+      ctx.moveTo(p.x - 8, py);
+      ctx.lineTo(p.x + 8, py);
+      ctx.moveTo(p.x, py - 8);
+      ctx.lineTo(p.x, py + 8);
       ctx.stroke();
       ctx.restore();
       // clear old marker after a while
       if (this.time - (this.moveMarker.time || 0) > 3) this.moveMarker = null;
     }
+    ctx.restore();
     // HUD & overlays (DOM-based)
     this.hud.update();
     this.hud.renderMiniMap();
@@ -485,6 +509,8 @@ export class Game {
     // integer tile coords
     if (y < 0 || x < 0 || y >= this.map.length || x >= this.map[0].length) return true;
     if (this.legend && this.symbolGrid) {
+      const sym = this.symbolGrid[y][x];
+      if (sym === ' ' || sym == null) return true; // void outside shape
       const sym = this.symbolGrid[y][x];
       const L = this.legend[sym];
       return !(L && L.passable);

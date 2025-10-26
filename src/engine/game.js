@@ -36,6 +36,10 @@ export class Game {
     this._setupInput();
     this.last = performance.now();
     this.hud = new HUD(this);
+    // Lighting/time-of-day
+    this.lightingMode = 'day'; // 'day' | 'dawn' | 'dusk' | 'night'
+    this.lightingAuto = false;
+    this.lightingTime = 0; // seconds
   }
 
   _setupInput() {
@@ -55,6 +59,9 @@ export class Game {
       if (e.code === 'KeyR') this.weapons.reloadActive();
       if (e.code === 'KeyZ') this.weapons.cycleActive(+1);
       if (e.code === 'KeyX') this.weapons.toggleActiveType();
+      // Lighting controls
+      if (e.code === 'KeyL') this._cycleLightingMode();
+      if (e.code === 'KeyO') this.lightingAuto = !this.lightingAuto;
     });
     window.addEventListener('keyup', (e) => {
       this.input.keys[e.code] = false;
@@ -248,6 +255,8 @@ export class Game {
 
     // Update explored mask around player
     this._updateExplored();
+    // Time-of-day auto cycle
+    if (this.lightingAuto) { this.lightingTime += dt; }
   }
 
   draw() {
@@ -279,7 +288,9 @@ export class Game {
           img = this.assets.get(key);
         }
         if (img) {
-          drawIsoImage(ctx, img, x, y, 0, this.tileW, this.tileH, this.originX, this.originY);
+          let offsetY = 0;
+          if (this.tileHeightGrid && this.tileHeightGrid[y] && this.tileHeightGrid[y][x] === 'high') offsetY = -6;
+          drawIsoImage(ctx, img, x, y, 0, this.tileW, this.tileH, this.originX, this.originY, offsetY);
         } else {
           drawIsoTile(ctx, x, y, 0, this.tileW, this.tileH, (x + y) % 2 ? '#1b232c' : '#15202b', this.originX, this.originY);
         }
@@ -327,6 +338,8 @@ export class Game {
     this.hud.update();
     this.hud.renderMiniMap();
     if (this.debug) this._drawDebug();
+    // Apply lighting overlay post world draw
+    this._applyLightingOverlay();
   }
 
   _drawDebug() {
@@ -505,13 +518,52 @@ export class Game {
     this._clampOrigin(true);
   }
 
+  _cycleLightingMode() {
+    const modes = ['day','dawn','dusk','night'];
+    const i = modes.indexOf(this.lightingMode);
+    this.lightingMode = modes[(i+1)%modes.length];
+  }
+
+  _currentLighting() {
+    if (this.lightingAuto) {
+      const period = 120; // seconds for full day
+      const t = (this.lightingTime % period) / period; // 0..1
+      // Map 0..1 to phases with soft transitions
+      if (t < 0.25) return { mode: 'dawn', mix: t/0.25 };
+      if (t < 0.6) return { mode: 'day', mix: (t-0.25)/(0.35) };
+      if (t < 0.8) return { mode: 'dusk', mix: (t-0.6)/0.2 };
+      return { mode: 'night', mix: (t-0.8)/0.2 };
+    }
+    return { mode: this.lightingMode, mix: 1 };
+  }
+
+  _applyLightingOverlay() {
+    const { ctx, canvas } = this;
+    ctx.save();
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    const { mode } = this._currentLighting();
+    if (mode === 'day') { ctx.restore(); return; }
+    const w = canvas.width / (this.dpr||1), h = canvas.height / (this.dpr||1);
+    // Choose overlay color/composite per mode
+    let comp = 'multiply';
+    let c0 = 'rgba(255,200,120,0.18)', c1 = 'rgba(80,60,40,0.12)'; // dawn default
+    if (mode === 'dusk') { c0 = 'rgba(255,140,90,0.22)'; c1 = 'rgba(60,40,80,0.18)'; comp = 'multiply'; }
+    if (mode === 'night') { c0 = 'rgba(50,70,120,0.35)'; c1 = 'rgba(10,15,30,0.45)'; comp = 'multiply'; }
+    ctx.globalCompositeOperation = comp;
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, c0);
+    grad.addColorStop(1, c1);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+  }
+
   isBlocked(x, y) {
     // integer tile coords
     if (y < 0 || x < 0 || y >= this.map.length || x >= this.map[0].length) return true;
     if (this.legend && this.symbolGrid) {
       const sym = this.symbolGrid[y][x];
       if (sym === ' ' || sym == null) return true; // void outside shape
-      const sym = this.symbolGrid[y][x];
       const L = this.legend[sym];
       return !(L && L.passable);
     }

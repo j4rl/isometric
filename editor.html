@@ -6,19 +6,25 @@
     <title>Map Editor</title>
     <link rel="stylesheet" href="src/styles.css" />
     <style>
-      body { display: grid; grid-template-columns: 280px 1fr; height: 100vh; }
+      body { display: grid; grid-template-columns: 360px 1fr; height: 100vh; }
       #sidebar { background: #1b1f23; padding: 12px; overflow: auto; border-right: 1px solid rgba(255,255,255,0.08); }
       #editorCanvas { width: 100%; height: 100%; display: block; background: #0e1013; cursor: crosshair; }
-      .palette { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+      .palette { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
       .color { height: 28px; border: 2px solid rgba(255,255,255,0.2); cursor: pointer; }
       .color.active { border-color: #fff; }
       .row { margin: 8px 0; }
       .label { font-size: 12px; opacity: 0.9; margin-bottom: 4px; }
       .btn { padding: 6px 10px; background: #4a90e2; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
       input[type=number] { width: 80px; }
+      /* Two-column legend for compactness */
+      .legend-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; }
+      .legend-item { display: flex; align-items: center; gap: 6px; min-height: 16px; }
     </style>
   </head>
   <body>
+    <div class="top-actions">
+      <a class="btn-nav" href="index.html">Exit Editor</a>
+    </div>
     <div id="sidebar">
       <h2>Map Editor</h2>
       <div class="row">
@@ -37,6 +43,15 @@
         <label><input type="checkbox" id="flood" /> Flood Fill</label>
       </div>
       <div class="row">
+        <div class="label">History</div>
+        <button class="btn" id="undoBtn" title="Undo (Ctrl+Z)">Undo</button>
+        <button class="btn" id="redoBtn" title="Redo (Ctrl+Y / Ctrl+Shift+Z)">Redo</button>
+      </div>
+      <div class="row">
+        <div class="label">Current Brush</div>
+        <div id="brush-info" style="font-size:12px; opacity:0.9"></div>
+      </div>
+      <div class="row">
         <div class="label">Import PNG</div>
         <input type="file" id="importPng" accept="image/png,image/jpeg" />
       </div>
@@ -44,26 +59,12 @@
         <button class="btn" id="exportPng">Export PNG</button>
       </div>
       <div class="row">
-        <div class="label">Legend (colors)</div>
-        <ul style="font-size:12px; line-height:1.6">
-          <li><span style="color:#4CAF50">■</span> Grass</li>
-          <li><span style="color:#8D6E63">■</span> Dirt</li>
-          <li><span style="color:#607D8B">■</span> Road</li>
-          <li><span style="color:#2196F3">■</span> Water</li>
-          <li><span style="color:#795548">■</span> Rock</li>
-          <li><span style="color:#2E7D32">■</span> Tall grass</li>
-          <li><span style="color:#1B5E20">■</span> Bush</li>
-          <li><span style="color:#33691E">■</span> Tree</li>
-          <li><span style="color:#9E9E9E">■</span> Ruin</li>
-          <li><span style="color:#5D4037">■</span> Debris</li>
-          <li><span style="color:#BDBDBD">■</span> Burned Car</li>
-          <li><span style="color:#FF5722">■</span> Portal</li>
-          <li><span style="color:#FFEB3B">■</span> Player Spawn</li>
-          <li><span style="color:#00E676">■</span> Waypoint</li>
-          <li><span style="color:#F44336">■</span> Enemy Spawn AI1</li>
-          <li><span style="color:#D32F2F">■</span> Enemy Spawn AI2</li>
-          <li><span style="color:#B71C1C">■</span> Enemy Spawn AI3</li>
-        </ul>
+        <div class="label">Hover</div>
+        <div id="hover-info" style="font-size:12px; opacity:0.9"></div>
+      </div>
+      <div class="row">
+        <div class="label">Legend</div>
+        <ul id="legend-list" style="font-size:12px; line-height:1.8; list-style:none; padding:0; margin:0"></ul>
       </div>
     </div>
     <canvas id="editorCanvas"></canvas>

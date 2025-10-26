@@ -1,0 +1,75 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Isometric Game Prototype</title>
+    <link rel="stylesheet" href="src/styles.css" />
+  </head>
+  <body>
+    <div id="ui">
+      <h1>Isometric Game</h1>
+      <div class="help">
+        <p>Move: WASD or Right-Click · Aim/Attack: Left-Click · Slots: 1/2 or Q toggle · Cycle Weapon: Z · Toggle Type: X · Reload: R · Pan: Middle Drag or Arrow Keys · Debug: G</p>
+      </div>
+    </div>
+    <canvas id="game"></canvas>
+    <div id="char-create" class="modal">
+      <div class="modal-card">
+        <h2>Create Your Character</h2>
+        <p>Distribute 10 points. Max 10 per stat.</p>
+        <div class="grid-3">
+          <div class="stat">
+            <div class="label">Strength</div>
+            <div class="controls">
+              <button class="btn" data-dec="str">-</button>
+              <span class="val" id="val-str">0</span>
+              <button class="btn" data-inc="str">+</button>
+            </div>
+          </div>
+          <div class="stat">
+            <div class="label">Agility</div>
+            <div class="controls">
+              <button class="btn" data-dec="agi">-</button>
+              <span class="val" id="val-agi">0</span>
+              <button class="btn" data-inc="agi">+</button>
+            </div>
+          </div>
+          <div class="stat">
+            <div class="label">Perception</div>
+            <div class="controls">
+              <button class="btn" data-dec="per">-</button>
+              <span class="val" id="val-per">0</span>
+              <button class="btn" data-inc="per">+</button>
+            </div>
+          </div>
+        </div>
+        <div class="points">Points left: <span id="points-left">10</span></div>
+        <h3 class="section">Choose Weapons (click two)</h3>
+        <div id="wep-list" class="wep-list"></div>
+        <div class="actions">
+          <button id="start-game" class="primary" disabled>Start</button>
+        </div>
+      </div>
+    </div>
+    <div id="hud">
+      <div class="hud-left">
+        <div class="hp">
+          <div class="hp-bar"><div class="hp-fill" id="hp-fill"></div></div>
+          <div class="hp-text" id="hp-text">HP 0/0</div>
+        </div>
+        <div class="weapon" id="weapon-text">Weapon: —</div>
+        <div class="stats" id="stats-text">STR 0 · AGI 0 · PER 0</div>
+        <div class="slots">
+          <span class="slot-ind" id="slot0-ind">1</span>
+          <span class="slot-ind" id="slot1-ind">2</span>
+        </div>
+      </div>
+      <div class="hud-right">
+        <canvas id="minimap" width="260" height="96"></canvas>
+        <div class="target" id="target-box"><span id="target-text"></span></div>
+      </div>
+    </div>
+    <script type="module" src="src/main.js"></script>
+  </body>
+  </html>

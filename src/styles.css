@@ -8,6 +8,29 @@ html, body {
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
 }
 
+/* Top-right navigation actions shown on game/editor pages */
+.top-actions {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 15;
+  display: flex;
+  gap: 8px;
+}
+.btn-nav {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.08);
+  color: #e8eaed;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 600;
+  transition: background .15s ease;
+}
+.btn-nav:hover { background: rgba(255,255,255,0.14); }
+
 #ui {
   position: absolute;
   top: 10px;

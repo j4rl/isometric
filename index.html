@@ -1,75 +1,40 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Isometric Game Prototype</title>
+    <title>Isometric Apocalypse</title>
     <link rel="stylesheet" href="src/styles.css" />
+    <style>
+      .landing { position: fixed; inset: 0; display: grid; place-items: center; background: radial-gradient(1200px 800px at 70% 30%, rgba(90,120,160,0.18), rgba(0,0,0,0)) , linear-gradient(180deg, #0e1116 0%, #12151a 60%, #0d1014 100%); }
+      .hero { max-width: 820px; padding: 32px; border-radius: 12px; background: rgba(20,22,26,0.80); border: 1px solid rgba(255,255,255,0.06); box-shadow: 0 20px 60px rgba(0,0,0,0.45); }
+      .title { margin: 0 0 10px 0; font-size: 36px; line-height: 1.2; letter-spacing: 0.5px; }
+      .tagline { margin: 0 0 16px 0; font-size: 16px; opacity: 0.9; color: #cfd8dc; }
+      .bullets { margin: 10px 0 22px 18px; font-size: 14px; color: #cfd8dc; }
+      .actions { display: flex; gap: 12px; }
+      .btn { padding: 12px 16px; font-weight: 700; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12); cursor: pointer; text-decoration: none; color: #e8eaed; background: rgba(255,255,255,0.06); }
+      .btn.primary { background: #4a90e2; color: #0b0f14; border-color: transparent; }
+      .btn.secondary { background: rgba(255,255,255,0.08); }
+      .meta { margin-top: 14px; font-size: 12px; opacity: 0.8; color: #9aa0a6; }
+    </style>
   </head>
   <body>
-    <div id="ui">
-      <h1>Isometric Game</h1>
-      <div class="help">
-        <p>Move: WASD or Right-Click · Aim/Attack: Left-Click · Slots: 1/2 or Q toggle · Cycle Weapon: Z · Toggle Type: X · Reload: R · Pan: Middle Drag or Arrow Keys · Debug: G</p>
-      </div>
-    </div>
-    <canvas id="game"></canvas>
-    <div id="char-create" class="modal">
-      <div class="modal-card">
-        <h2>Create Your Character</h2>
-        <p>Distribute 10 points. Max 10 per stat.</p>
-        <div class="grid-3">
-          <div class="stat">
-            <div class="label">Strength</div>
-            <div class="controls">
-              <button class="btn" data-dec="str">-</button>
-              <span class="val" id="val-str">0</span>
-              <button class="btn" data-inc="str">+</button>
-            </div>
-          </div>
-          <div class="stat">
-            <div class="label">Agility</div>
-            <div class="controls">
-              <button class="btn" data-dec="agi">-</button>
-              <span class="val" id="val-agi">0</span>
-              <button class="btn" data-inc="agi">+</button>
-            </div>
-          </div>
-          <div class="stat">
-            <div class="label">Perception</div>
-            <div class="controls">
-              <button class="btn" data-dec="per">-</button>
-              <span class="val" id="val-per">0</span>
-              <button class="btn" data-inc="per">+</button>
-            </div>
-          </div>
-        </div>
-        <div class="points">Points left: <span id="points-left">10</span></div>
-        <h3 class="section">Choose Weapons (click two)</h3>
-        <div id="wep-list" class="wep-list"></div>
+    <div class="landing">
+      <div class="hero">
+        <h1 class="title">Isometric Apocalypse</h1>
+        <p class="tagline">Explore a post‑apocalyptic world. Scavenge, fight, and survive with melee and ranged weapons across hand‑drawn ASCII or bitmap maps.</p>
+        <ul class="bullets">
+          <li>Organic A* pathfinding and camera follow</li>
+          <li>Two flexible weapon slots, requirements, DPS and ammo</li>
+          <li>Bitmap editor for rivers, debris, trees, ruins, and spawns</li>
+          <li>Fog of war, explored minimap, portals between maps</li>
+        </ul>
         <div class="actions">
-          <button id="start-game" class="primary" disabled>Start</button>
+          <a class="btn primary" href="game.html">Play · Create Character</a>
+          <a class="btn secondary" href="editor.html">Open Map Editor</a>
         </div>
+        <div class="meta">Tip: Bitmap maps are default (e.g., <code>maps/map1.png</code>). To load a specific file, use <code>game.html?bmp=maps/map1.png</code>.</div>
       </div>
     </div>
-    <div id="hud">
-      <div class="hud-left">
-        <div class="hp">
-          <div class="hp-bar"><div class="hp-fill" id="hp-fill"></div></div>
-          <div class="hp-text" id="hp-text">HP 0/0</div>
-        </div>
-        <div class="weapon" id="weapon-text">Weapon: —</div>
-        <div class="stats" id="stats-text">STR 0 · AGI 0 · PER 0</div>
-        <div class="slots">
-          <span class="slot-ind" id="slot0-ind">1</span>
-          <span class="slot-ind" id="slot1-ind">2</span>
-        </div>
-      </div>
-      <div class="hud-right">
-        <canvas id="minimap" width="260" height="96"></canvas>
-        <div class="target" id="target-box"><span id="target-text"></span></div>
-      </div>
-    </div>
-    <script type="module" src="src/main.js"></script>
   </body>
   </html>

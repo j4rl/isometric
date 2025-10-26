@@ -2,7 +2,7 @@ import { Game } from './engine/game.js';
 import { Assets } from './engine/assets.js';
 import { Enemy, createEnemyByType } from './engine/entity.js';
 import { initCharacterCreate } from './ui/char_create.js';
-import { loadMapById, loadBitmapMap, defaultBitmapPalette } from './maps/loader.js';
+import { loadBitmapMap, defaultBitmapPalette } from './maps/loader.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d', { alpha: false });
@@ -13,22 +13,23 @@ const TILE_H = 48; // height of diamond (px)
 
 // Asset loader with PNG support
 const assets = new Assets();
+const tileSources = {
+  // Tiles now live under maps/tiles/ so map packs can include their own textures
+  grass: 'maps/tiles/grass.png',
+  stone: 'maps/tiles/stone.png',
+  rock:  'maps/tiles/rock.png',
+  water: 'maps/tiles/water.png',
+  bridge: 'maps/tiles/bridge.png',
+  bush: 'maps/tiles/bush.png',
+  tree: 'maps/tiles/tree.png',
+  tallGrass: 'maps/tiles/tallGrass.png',
+  house: 'maps/tiles/house.png',
+  hut: 'maps/tiles/hut.png',
+  dirt: 'maps/tiles/dirt.png',
+  portal: 'maps/tiles/portal.png'
+};
 await assets.load({
-  tiles: {
-    // Tiles now live under maps/tiles/ so map packs can include their own textures
-    grass: 'maps/tiles/grass.png',
-    stone: 'maps/tiles/stone.png',
-    rock:  'maps/tiles/rock.png',
-    water: 'maps/tiles/water.png',
-    bridge: 'maps/tiles/bridge.png',
-    bush: 'maps/tiles/bush.png',
-    tree: 'maps/tiles/tree.png',
-    tallGrass: 'maps/tiles/tallGrass.png',
-    house: 'maps/tiles/house.png',
-    hut: 'maps/tiles/hut.png',
-    dirt: 'maps/tiles/dirt.png',
-    portal: 'maps/tiles/portal.png'
-  },
+  tiles: tileSources,
   entities: {
     // Use simple spritesheets for player/enemy if available; placeholders autogen if missing
     player: { type: 'sheet', url: 'assets/entities/player.png', fw: 32, fh: 40, fps: 8 },
@@ -37,7 +38,17 @@ await assets.load({
     slash: { type: 'sheet', url: 'assets/entities/slash.png', fw: 40, fh: 40, fps: 24 }
   }
 });
-// Ensure built-in placeholders if external PNGs are missing
+// Tile visual style: default to 'realistic'. You can override with ?tiles=procedural|png
+const params = new URLSearchParams(location.search);
+let currentTileStyle = (params.get('tiles') || 'realistic').toLowerCase();
+const tuning = { brightness: parseFloat(params.get('tb')||'0')||0, grainScale: parseFloat(params.get('tg')||'1')||1 };
+async function applyTileStyle() {
+  if (currentTileStyle === 'realistic') { assets.setRealisticTuning(tuning); assets.ensureRealisticTiles(); }
+  else if (currentTileStyle === 'procedural') { assets.ensureProceduralTiles(); }
+  else if (currentTileStyle === 'png') { await assets.load({ tiles: tileSources }); }
+}
+await applyTileStyle();
+// Always ensure entity placeholders
 assets.ensurePlaceholders();
 
 // Create the game
@@ -58,19 +69,23 @@ function resizeCanvas() {
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
-// Load map from file `maps/map_X.txt` where X is a number; default to 1 and fallback to 1
-const params = new URLSearchParams(location.search);
-const bmp = params.get('bmp');
-const mapId = parseInt(params.get('map') || '1', 10) || 1;
-let mapDesc = null;
-if (bmp) {
-  // Load bitmap map
-  mapDesc = await loadBitmapMap(bmp, { palette: defaultBitmapPalette() });
-} else {
-  mapDesc = await loadMapById(mapId);
+// Prefer bitmap maps by default. You can override via ?bmp=path.png
+// Reuse params for map loading below
+let bmpPath = params.get('bmp') || 'maps/map1.png';
+
+function parseBmpSeries(path) {
+  const m = /^(.*?)(\d+)(\.png)$/i.exec(path);
+  if (!m) return null;
+  return { base: m[1], index: parseInt(m[2], 10) || 1, suffix: m[3] };
 }
-if (!mapDesc && mapId !== 1) {
-  mapDesc = await loadMapById(1);
+let bmpSeries = parseBmpSeries(bmpPath);
+
+let mapDesc = await loadBitmapMap(bmpPath, { palette: defaultBitmapPalette() });
+if (!mapDesc && !params.get('bmp')) {
+  // Fallback to default if custom bmp missing
+  bmpPath = 'maps/map1.png';
+  bmpSeries = parseBmpSeries(bmpPath);
+  mapDesc = await loadBitmapMap(bmpPath, { palette: defaultBitmapPalette() });
 }
 
 game.setMap(mapDesc);
@@ -79,7 +94,22 @@ game.start();
 
 // Keep reference to current map descriptor for spawning player via UI
 let currentMapDesc = mapDesc;
+let currentBmpPath = bmpPath;
+let currentSeries = bmpSeries;
 initCharacterCreate(game, () => currentMapDesc);
+// Live tile style/tuning controls
+window.addEventListener('keydown', async (e) => {
+  if (e.code === 'KeyT') {
+    const styles = ['realistic','procedural','png'];
+    const i = styles.indexOf(currentTileStyle);
+    currentTileStyle = styles[(i + 1) % styles.length];
+    await applyTileStyle();
+  }
+  if (e.code === 'Equal') { tuning.brightness = Math.min(0.5, tuning.brightness + 0.05); if (currentTileStyle==='realistic') { assets.setRealisticTuning(tuning); assets.ensureRealisticTiles(); } }
+  if (e.code === 'Minus') { tuning.brightness = Math.max(-0.5, tuning.brightness - 0.05); if (currentTileStyle==='realistic') { assets.setRealisticTuning(tuning); assets.ensureRealisticTiles(); } }
+  if (e.code === 'BracketRight') { tuning.grainScale = Math.min(3, tuning.grainScale + 0.1); if (currentTileStyle==='realistic') { assets.setRealisticTuning(tuning); assets.ensureRealisticTiles(); } }
+  if (e.code === 'BracketLeft') { tuning.grainScale = Math.max(0, tuning.grainScale - 0.1); if (currentTileStyle==='realistic') { assets.setRealisticTuning(tuning); assets.ensureRealisticTiles(); } }
+});
 
 function findSpawn(desc) {
   if (!desc || !desc.grid || !desc.legend) return { x: 1, y: 1 };
@@ -109,13 +139,23 @@ function findSpawn(desc) {
   return { x: 1, y: 1 };
 }
 
-let currentMapId = mapId;
 window.addEventListener('game:portal', async () => {
-  currentMapId = (currentMapId || 1) + 1;
-  let next = await loadMapById(currentMapId);
-  if (!next) {
-    currentMapId = 1;
-    next = await loadMapById(1);
+  let nextPath = currentBmpPath;
+  if (currentSeries) {
+    const nextIndex = (currentSeries.index || 1) + 1;
+    nextPath = `${currentSeries.base}${nextIndex}${currentSeries.suffix}`;
+  } else {
+    // If not a numbered series, try a sensible default sequence
+    const guess = parseBmpSeries('maps/map1.png');
+    currentSeries = guess;
+    nextPath = 'maps/map2.png';
+  }
+  let next = await loadBitmapMap(nextPath, { palette: defaultBitmapPalette() });
+  if (!next && currentSeries) {
+    // wrap to first
+    nextPath = `${currentSeries.base}1${currentSeries.suffix}`;
+    next = await loadBitmapMap(nextPath, { palette: defaultBitmapPalette() });
+    currentSeries.index = 1;
   }
   if (next) {
     game.setMap(next);
@@ -128,6 +168,8 @@ window.addEventListener('game:portal', async () => {
     spawnFromMap(next);
     game.autopilot = null;
     currentMapDesc = next;
+    currentBmpPath = nextPath;
+    if (currentSeries) currentSeries.index = parseBmpSeries(nextPath)?.index || currentSeries.index;
   }
 });
 

@@ -100,66 +100,7 @@ export async function loadMapById(id, { legend = tileLegend, mapping } = {}) {
 }
 
 // Bitmap loader: interprets colors as symbols via provided palette
-export async function loadBitmapMap(url, { palette, legend = tileLegend } = {}) {
-  try {
-    const img = await loadImage(url);
-    const cnv = document.createElement('canvas');
-    cnv.width = img.width; cnv.height = img.height;
-    const ctx = cnv.getContext('2d');
-    ctx.drawImage(img, 0, 0);
-    const { data } = ctx.getImageData(0, 0, cnv.width, cnv.height);
-    const w = cnv.width, h = cnv.height;
-    const grid = new Array(h).fill(0).map(() => new Array(w).fill(' '));
-    const pal = palette || defaultBitmapPalette();
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        const i = (y * w + x) * 4;
-        const a = data[i+3];
-        if (a === 0) { grid[y][x] = ' '; continue; } // void/outside map
-        const r = data[i], g = data[i+1], b = data[i+2];
-        const hex = rgbToHex(r,g,b);
-        grid[y][x] = pal[hex] || 'G';
-      }
-    }
-    return { grid, legend };
-  } catch (e) {
-    console.warn('Bitmap map load failed', url, e);
-    return null;
-  }
-}
-
-function loadImage(src) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = src;
-  });
-}
-function rgbToHex(r,g,b){
-  const to2 = (n)=>n.toString(16).padStart(2,'0');
-  return `#${to2(r)}${to2(g)}${to2(b)}`.toUpperCase();
-}
-
-export function defaultBitmapPalette() {
-  // Map colors to symbols (post-apoc theme); customize per-level as needed
-  return {
-    '#4CAF50': 'G',  // grass
-    '#8D6E63': 'D',  // dirt
-    '#607D8B': 'S',  // stone/road
-    '#2196F3': 'W',  // water/river
-    '#795548': 'R',  // rock
-    '#2E7D32': 't',  // tall grass
-    '#1B5E20': 'b',  // bush
-    '#33691E': 'T',  // tree
-    '#9E9E9E': 'H',  // house/ruin
-    '#FF5722': 'P',  // portal
-    '#FFEB3B': 'A',  // arrival (player spawn)
-    '#F44336': 'E1', // enemy spawn AI1
-    '#D32F2F': 'E2', // enemy spawn AI2
-    '#B71C1C': 'E3', // enemy spawn AI3
-  };
-}
+// (deduped: older bitmap loader/palette removed; see final versions below)
 
 // Bitmap loader: interprets colors as symbols via provided palette
 export async function loadBitmapMap(url, { palette, legend = tileLegend } = {}) {

@@ -11,11 +11,47 @@
       <h1>Isometric Game</h1>
       <div class="help">
         <p>
-          Move: WASD or Left‑Click · Aim: Mouse · Melee: Space · Ranged: F · Weapon: 1/2 or Q · Pan: Right/Middle Drag or Arrow Keys · Debug: G
+          Move: WASD or Right‑Click · Aim/Attack: Left‑Click · Melee: Space · Ranged: F · Weapon Slot: 1/2 or Q · Cycle Melee: Z · Reload: R · Pan: Middle Drag or Arrow Keys · Debug: G
         </p>
       </div>
     </div>
     <canvas id="game"></canvas>
+    <div id="char-create" class="modal">
+      <div class="modal-card">
+        <h2>Create Your Character</h2>
+        <p>Distribute 10 points. Max 10 per stat.</p>
+        <div class="grid-3">
+          <div class="stat">
+            <div class="label">Strength</div>
+            <div class="controls">
+              <button class="btn" data-dec="str">-</button>
+              <span class="val" id="val-str">0</span>
+              <button class="btn" data-inc="str">+</button>
+            </div>
+          </div>
+          <div class="stat">
+            <div class="label">Agility</div>
+            <div class="controls">
+              <button class="btn" data-dec="agi">-</button>
+              <span class="val" id="val-agi">0</span>
+              <button class="btn" data-inc="agi">+</button>
+            </div>
+          </div>
+          <div class="stat">
+            <div class="label">Perception</div>
+            <div class="controls">
+              <button class="btn" data-dec="per">-</button>
+              <span class="val" id="val-per">0</span>
+              <button class="btn" data-inc="per">+</button>
+            </div>
+          </div>
+        </div>
+        <div class="points">Points left: <span id="points-left">10</span></div>
+        <div class="actions">
+          <button id="start-game" class="primary" disabled>Start</button>
+        </div>
+      </div>
+    </div>
     <div id="hud">
       <div class="hud-left">
         <div class="hp">

@@ -22,7 +22,9 @@ export class HUD {
       this.hpText.textContent = `HP ${Math.ceil(p.hp)}/${p.maxHp}`;
     }
     if (this.weaponText) {
-      this.weaponText.textContent = `Weapon: ${g.currentWeapon === 'melee' ? 'Melee (1)' : 'Ranged (2)'} · Toggle: Q`;
+      const info = g.weapons.getInfo(g.currentWeapon, p);
+      const ammo = info.ammo ? ` · Ammo ${info.ammo} (R reload)` : '';
+      this.weaponText.textContent = `Weapon: ${info.name} · Range ${info.range} · Dmg ~${info.damage} · DPS ~${info.dps}${ammo} (Toggle: Q, 1/2)`;
     }
     if (this.statsText && p?.stats) {
       const { str, agi, per } = p.stats;
@@ -96,6 +98,18 @@ export class HUD {
       }
     }
 
+    // Unexplored mask: blacken tiles not explored yet
+    if (g.explored) {
+      ctx.fillStyle = 'rgba(0,0,0,0.85)';
+      for (let ty = 0; ty < h; ty++) {
+        for (let tx = 0; tx < w; tx++) {
+          if (!g.explored[ty]?.[tx]) {
+            ctx.fillRect(Math.floor(offX + tx * s), Math.floor(offY + ty * s), Math.ceil(s), Math.ceil(s));
+          }
+        }
+      }
+    }
+
     // Overlay portals and arrival markers
     if (g.legend && g.symbolGrid) {
       for (let ty = 0; ty < h; ty++) {
@@ -115,6 +129,21 @@ export class HUD {
           }
         }
       }
+    }
+
+    // Fog of war: dim outside player's perception radius (current visibility only)
+    if (g.player) {
+      const per = g.player?.stats?.per ?? 3;
+      const radiusTiles = 5 + (per - 3) * 1.4; // perception-based
+      const px = offX + g.player.x * s;
+      const py = offY + g.player.y * s;
+      const r0 = Math.max(8, radiusTiles * s);
+      const r1 = r0 * 1.6;
+      const grad = ctx.createRadialGradient(px, py, r0, px, py, r1);
+      grad.addColorStop(0, 'rgba(0,0,0,0)');
+      grad.addColorStop(1, 'rgba(0,0,0,0.6)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, cssW, cssH);
     }
 
     // Viewport rectangle

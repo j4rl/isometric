@@ -18,16 +18,16 @@ export class Entity {
   }
 
   _recalcDerived() {
-    const { str, agi } = this.stats;
+    const { str, agi, per } = this.stats;
     // Movement speed affected by agility
     this.speed = this.baseSpeed * (1 + (agi - 3) * 0.08);
     // Toughness reduces incoming damage
     this.toughness = Math.max(0, Math.min(0.35, (str - 3) * 0.03));
     // Dodge chance from agility
     this.dodge = Math.max(0, Math.min(0.3, (agi - 3) * 0.03));
-    // Bonus HP from strength
-    const bonusHp = Math.max(0, (str - 3) * 10);
-    this.maxHp = Math.max(this.maxHp, this.hp) + bonusHp; // adjust cap
+    // Max HP weighted by stats (STR most important, then AGI, then PER)
+    const maxHp = 60 + Math.max(0, 8 * str) + Math.max(0, 5 * agi) + Math.max(0, 3 * per);
+    this.maxHp = maxHp;
     if (this.hp > this.maxHp) this.hp = this.maxHp;
   }
 

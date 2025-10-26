@@ -32,6 +32,7 @@ export class Game {
     this.dt = 0;
     this.autopilot = null; // { path: [{x,y}, ...] }
     this.drag = { active: false, lastX: 0, lastY: 0 };
+    this.explored = null; // fog-of-war explored mask [y][x] = boolean
     this._setupInput();
     this.last = performance.now();
     this.hud = new HUD(this);
@@ -50,6 +51,8 @@ export class Game {
       if (e.code === 'Digit1') this.currentWeapon = 'melee';
       if (e.code === 'Digit2') this.currentWeapon = 'ranged';
       if (e.code === 'KeyQ') this.currentWeapon = (this.currentWeapon === 'melee' ? 'ranged' : 'melee');
+      if (e.code === 'KeyR') this.weapons.reload(this.currentWeapon);
+      if (e.code === 'KeyZ') this.weapons.cycleMelee(+1);
     });
     window.addEventListener('keyup', (e) => {
       this.input.keys[e.code] = false;
@@ -80,24 +83,34 @@ export class Game {
     this.canvas.addEventListener('mouseenter', updateMouse);
     this.canvas.addEventListener('mouseleave', updateMouse);
     this.canvas.addEventListener('mousedown', (e) => {
-      // Left-click: pathfind move
+      // Left-click: target/attack
       if (e.button === 0 && this.player) {
+        // Select hover target and attempt one attack with selected weapon
+        const target = this.hoverTarget || null;
+        if (target) {
+          const kind = this.currentWeapon === 'ranged' ? 'ranged' : 'melee';
+          this.weapons.use(kind, this.player, target);
+        }
+      }
+      // Middle: drag-pan
+      if (e.button === 1) {
+        this.drag.active = true;
+        this.drag.lastX = e.clientX;
+        this.drag.lastY = e.clientY;
+        e.preventDefault();
+      }
+      // Right: set move marker and pathfind move
+      if (e.button === 2 && this.player) {
         const w = this.input.mouseWorld;
         const tx = Math.round(w.x);
         const ty = Math.round(w.y);
+        this.moveMarker = { x: tx, y: ty, time: this.time };
         if (!this.pathfinder) return;
         const path = this.pathfinder.findPath({ x: Math.round(this.player.x), y: Math.round(this.player.y) }, { x: tx, y: ty });
         if (path && path.length) {
           const smooth = this._smoothPath(path);
           this.autopilot = { path: smooth.map(p => ({ x: p.x, y: p.y })) };
         }
-      }
-      // Middle or right: drag-pan
-      if (e.button === 1 || e.button === 2) {
-        this.drag.active = true;
-        this.drag.lastX = e.clientX;
-        this.drag.lastY = e.clientY;
-        e.preventDefault();
       }
     });
     window.addEventListener('mouseup', () => { this.drag.active = false; });
@@ -146,6 +159,8 @@ export class Game {
     this._computeBounds();
     this._applyFit();
     this._clampOrigin(true);
+    // Reset explored mask
+    this.explored = new Array(h).fill(0).map(() => new Array(w).fill(false));
   }
 
   spawnDemo() {
@@ -209,6 +224,9 @@ export class Game {
 
     // Hover target detection near mouse
     this._updateHoverTarget();
+
+    // Update explored mask around player
+    this._updateExplored();
   }
 
   draw() {
@@ -261,6 +279,26 @@ export class Game {
     drawables.sort((a, b) => (a.y + a.x) - (b.y + b.x));
     for (const d of drawables) d.draw(ctx, this);
     ctx.restore();
+    // Move marker overlay
+    if (this.moveMarker) {
+      const p = this.worldToScreen(this.moveMarker.x, this.moveMarker.y);
+      ctx.save();
+      ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+      ctx.strokeStyle = '#6cf';
+      ctx.globalAlpha = 0.9;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 10, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(p.x - 8, p.y);
+      ctx.lineTo(p.x + 8, p.y);
+      ctx.moveTo(p.x, p.y - 8);
+      ctx.lineTo(p.x, p.y + 8);
+      ctx.stroke();
+      ctx.restore();
+      // clear old marker after a while
+      if (this.time - (this.moveMarker.time || 0) > 3) this.moveMarker = null;
+    }
     // HUD & overlays (DOM-based)
     this.hud.update();
     this.hud.renderMiniMap();
@@ -417,6 +455,24 @@ export class Game {
       }
     }
     this.hoverTarget = best;
+  }
+
+  _updateExplored() {
+    if (!this.player || !this.explored || !this.map?.length) return;
+    const h = this.map.length; const w = this.map[0].length;
+    const cx = Math.round(this.player.x);
+    const cy = Math.round(this.player.y);
+    const per = this.player?.stats?.per ?? 3;
+    const radius = Math.max(1, Math.floor(5 + (per - 3) * 1.4));
+    const r2 = radius * radius;
+    const y0 = Math.max(0, cy - radius), y1 = Math.min(h - 1, cy + radius);
+    const x0 = Math.max(0, cx - radius), x1 = Math.min(w - 1, cx + radius);
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        const dx = x - this.player.x; const dy = y - this.player.y;
+        if (dx*dx + dy*dy <= r2) this.explored[y][x] = true;
+      }
+    }
   }
 
   handleResize(dpr = 1) {

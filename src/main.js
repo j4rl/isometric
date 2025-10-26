@@ -1,6 +1,7 @@
 import { Game } from './engine/game.js';
 import { Assets } from './engine/assets.js';
 import { Enemy, createEnemyByType } from './engine/entity.js';
+import { initCharacterCreate } from './ui/char_create.js';
 import { loadMapById } from './maps/loader.js';
 
 const canvas = document.getElementById('game');
@@ -68,6 +69,10 @@ game.setMap(mapDesc);
 spawnFromMap(mapDesc);
 game.start();
 
+// Keep reference to current map descriptor for spawning player via UI
+let currentMapDesc = mapDesc;
+initCharacterCreate(game, () => currentMapDesc);
+
 function findSpawn(desc) {
   if (!desc || !desc.grid || !desc.legend) return { x: 1, y: 1 };
   const h = desc.grid.length; const w = h ? desc.grid[0].length : 0;
@@ -114,6 +119,7 @@ window.addEventListener('game:portal', async () => {
     game.effects = [];
     spawnFromMap(next);
     game.autopilot = null;
+    currentMapDesc = next;
   }
 });
 
